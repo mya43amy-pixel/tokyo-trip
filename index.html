@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>tokyo V1</title>
-    <link rel="apple-touch-icon" href="icon.png.JPG">
-    <link rel="manifest" href="manifest.json">
+    <link class="apple-touch-icon" href="icon.png.JPG">
+    <link class="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     
     <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-app-compat.js"></script>
@@ -400,6 +400,18 @@
                 walletList: {
                     handler() { if (this.activeTab === 'wallet') this.initChart(); },
                     deep: true
+                },
+                // 智慧防呆：切換收入與支出時，自動校正分類，防止選單空白
+                'form.wallet.type'(newType) {
+                    if (newType === '收入') {
+                        if (!['換錢', '退稅', '其他'].includes(this.form.wallet.category)) {
+                            this.form.wallet.category = '換錢';
+                        }
+                    } else {
+                        if (!['食物', '購物', '交通', '住宿', '其他'].includes(this.form.wallet.category)) {
+                            this.form.wallet.category = '食物';
+                        }
+                    }
                 }
             },
             computed: {
@@ -497,7 +509,10 @@
                 openEditModal(item) { this.form.plan = {...item}; this.modals.plan = true; },
                 toggleTransport(t) { let arr = this.getTransitArray(this.form.plan.transitType); if(arr.includes(t)) arr = arr.filter(i => i !== t); else arr.push(t); this.form.plan.transitType = arr.join(','); },
                 
-                openWalletModal(item = null) { this.form.wallet = item ? {...item} : {type: '支出', amount: '', currency: 'JPY', name: '', method: '現金', category: '食物', tag: '實際支出', memo: '', rate: 0}; this.modals.wallet = true; },
+                openWalletModal(item = null) { 
+                    this.form.wallet = item ? {...item} : {type: '支出', amount: '', currency: 'JPY', name: '', method: '現金', category: '食物', tag: '實際支出', memo: '', rate: 0}; 
+                    this.modals.wallet = true; 
+                },
                 openShopModal(item = null) { this.form.shop = item ? {...item} : {name: '', category: '美妝', image: '', memo: '', checked: false}; this.modals.shop = true; },
                 openMemoModal(item = null) { this.form.memo = item ? {...item} : {text: '', link: '', image: ''}; this.modals.memo = true; },
                 openSummaryModal() { this.tempSummary = this.dailySummaries[this.selectedDay] || ''; this.modals.summary = true; },
@@ -531,13 +546,15 @@
                 deleteData(type, id) { if(confirm('確定刪除？')) { db.ref(DATA_PATH).child(type + 'List').child(id).remove().then(() => this.modals[type] = false); } },
                 saveSummary() { db.ref(DATA_PATH).child('planSummary').child(this.selectedDay).set(this.tempSummary).then(() => this.modals.summary = false); },
                 
+                // 修正：抽離出純乾淨陣列再處理排序，完全解決 vuedraggable 在多分類渲染下的卡死報錯 Bug
                 saveShopOrder(cat, evt) {
-                    const items = Object.entries(this.dbData.shopList || {})
-                        .map(([id, val]) => ({ id, ...val }))
-                        .filter(i => i.category === cat)
-                        .sort((a, b) => (a.order || 0) - (b.order || 0));
+                    if (evt.oldIndex === evt.newIndex) return;
+                    
+                    const items = this.getShopItemsByCat(cat);
+                    const movedItem = items[evt.oldIndex];
+                    if (!movedItem) return;
 
-                    const [movedItem] = items.splice(evt.oldIndex, 1);
+                    items.splice(evt.oldIndex, 1);
                     items.splice(evt.newIndex, 0, movedItem);
 
                     const updates = {};
@@ -556,13 +573,22 @@
                     db.ref(DATA_PATH).update(updates);
                 },
 
+                // 優化：加入錯誤捕獲與安全防護，避免大圖導致 iOS 崩潰
                 exportImage() {
                     const el = document.getElementById('app');
-                    html2canvas(el, { useCORS: true, backgroundColor: "#f8fbfb", scale: 2 }).then(canvas => {
+                    html2canvas(el, { 
+                        useCORS: true, 
+                        backgroundColor: "#f8fbfb", 
+                        scale: 2,
+                        logging: false,
+                        allowTaint: true
+                    }).then(canvas => {
                         const link = document.createElement('a');
                         link.download = `Tokyo_Day${this.selectedDay + 1}.png`;
                         link.href = canvas.toDataURL();
                         link.click();
+                    }).catch(err => {
+                        alert('圖片匯出失敗，可能因為上傳圖片檔案過大，建議稍微精簡當日圖文再試試看喔！');
                     });
                 }
             }
