@@ -20,7 +20,6 @@
     <script src="https://cdn.jsdelivr.net/npm/vuedraggable@4.1.0/dist/vuedraggable.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-</head>
 
     <style>
         :root { 
@@ -299,7 +298,10 @@
                     </div>
                     <div>
                         <label class="block text-xs font-black text-gray-400 mb-2">類型</label>
-                        <select v-model="form.wallet.tag" class="input-round text-xs font-bold"><option value="實際支出">當地實際花費</option><option value="行前支出">行前預支</option></select>
+                        <select v-model="form.wallet.tag" class="input-round text-xs font-bold">
+                            <option value="實際支出">實際收支</option>
+                            <option value="行前支出">行前預支</option>
+                        </select>
                     </div>
                     <div><label class="block text-xs font-black text-gray-400 mb-2">備註</label><textarea v-model="form.wallet.memo" class="input-round h-20"></textarea></div>
                     <div class="flex gap-4 mt-8">
@@ -373,7 +375,7 @@
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        const DATA_PATH = 'tokyo_v1_solo'; // 換了新路徑避免蓋到你之前的紀錄
+        const DATA_PATH = 'tokyo_v1_solo';
 
         createApp({
             components: { draggable: window.vuedraggable },
@@ -405,7 +407,6 @@
                     handler() { if (this.activeTab === 'wallet') this.initChart(); },
                     deep: true
                 },
-                // 智慧防呆：切換收入與支出時，自動校正分類，防止選單空白
                 'form.wallet.type'(newType) {
                     if (newType === '收入') {
                         if (!['換錢', '退稅', '其他'].includes(this.form.wallet.category)) {
@@ -452,8 +453,8 @@
                         });
                     }
                 },
-                actualSpent() { return this.walletList.filter(i => i.tag === '實際支出' && i.type === '支出').reduce((a,c) => a + this.getJPY(c), 0); },
-                actualSpentTWD() { return this.walletList.filter(i => i.tag === '實際支出' && i.type === '支出').reduce((a,c) => a + this.getTWD(c), 0); },
+                actualSpent() { return this.walletList.filter(i => (i.tag === '實際支出' || i.tag === '實際收支') && i.type === '支出').reduce((a,c) => a + this.getJPY(c), 0); },
+                actualSpentTWD() { return this.walletList.filter(i => (i.tag === '實際支出' || i.tag === '實際收支') && i.type === '支出').reduce((a,c) => a + this.getTWD(c), 0); },
                 preTripSpent() { return this.walletList.filter(i => i.tag === '行前支出' && i.type === '支出').reduce((a,c) => a + this.getJPY(c), 0); },
                 preTripSpentTWD() { return this.walletList.filter(i => i.tag === '行前支出' && i.type === '支出').reduce((a,c) => a + this.getTWD(c), 0); },
                 remainingCash() {
@@ -494,18 +495,34 @@
                     if (this.chart) this.chart.destroy();
                     const categories = ['食物', '購物', '交通', '住宿', '其他'];
                     let chartData = categories.map(cat => {
-                        const amount = this.walletList.filter(i => i.type === '支出' && i.category === cat).reduce((a, c) => a + this.getJPY(c), 0);
-                        return { label: cat, value: amount };
+                        const items = this.walletList.filter(i => i.type === '支出' && i.category === cat);
+                        const amountJPY = items.reduce((a, c) => a + this.getJPY(c), 0);
+                        const amountTWD = items.reduce((a, c) => a + this.getTWD(c), 0);
+                        return { label: cat, value: amountJPY, twd: amountTWD };
                     });
                     chartData.sort((a, b) => b.value - a.value);
                     const colorMap = { '食物': '#2C2C2C', '購物': '#555555', '交通': '#777777', '住宿': '#999999', '其他': '#CCCCCC' };
                     this.chart = new Chart(ctx, {
                         type: 'doughnut',
                         data: {
-                            labels: chartData.map(d => `${d.label} ¥${this.formatNum(d.value)}`),
+                            labels: chartData.map(d => `${d.label} : ¥${this.formatNum(d.value)} (≈ NT$ ${this.formatNum(d.twd)})`),
                             datasets: [{ data: chartData.map(d => d.value), backgroundColor: chartData.map(d => colorMap[d.label]), borderWidth: 0 }]
                         },
-                        options: { plugins: { legend: { display: true, position: 'bottom', labels: { padding: 20, usePointStyle: true, font: { size: 10, weight: 'bold' } } } }, cutout: '65%' }
+                        options: { 
+                            plugins: { 
+                                legend: { 
+                                    display: true, 
+                                    position: 'bottom', 
+                                    labels: { 
+                                        padding: 12, 
+                                        usePointStyle: true, 
+                                        boxWidth: 8,
+                                        font: { size: 11, weight: 'bold' } 
+                                    } 
+                                } 
+                            }, 
+                            cutout: '60%' 
+                        }
                     });
                 },
 
@@ -514,7 +531,12 @@
                 toggleTransport(t) { let arr = this.getTransitArray(this.form.plan.transitType); if(arr.includes(t)) arr = arr.filter(i => i !== t); else arr.push(t); this.form.plan.transitType = arr.join(','); },
                 
                 openWalletModal(item = null) { 
-                    this.form.wallet = item ? {...item} : {type: '支出', amount: '', currency: 'JPY', name: '', method: '現金', category: '食物', tag: '實際支出', memo: '', rate: 0}; 
+                    if (item) {
+                        this.form.wallet = {...item};
+                        if (this.form.wallet.tag === '實際支出') this.form.wallet.tag = '實際收支';
+                    } else {
+                        this.form.wallet = {type: '支出', amount: '', currency: 'JPY', name: '', method: '現金', category: '食物', tag: '實際收支', memo: '', rate: 0}; 
+                    }
                     this.modals.wallet = true; 
                 },
                 openShopModal(item = null) { this.form.shop = item ? {...item} : {name: '', category: '美妝', image: '', memo: '', checked: false}; this.modals.shop = true; },
@@ -550,7 +572,6 @@
                 deleteData(type, id) { if(confirm('確定刪除？')) { db.ref(DATA_PATH).child(type + 'List').child(id).remove().then(() => this.modals[type] = false); } },
                 saveSummary() { db.ref(DATA_PATH).child('planSummary').child(this.selectedDay).set(this.tempSummary).then(() => this.modals.summary = false); },
                 
-                // 修正：抽離出純乾淨陣列再處理排序，完全解決 vuedraggable 在多分類渲染下的卡死報錯 Bug
                 saveShopOrder(cat, evt) {
                     if (evt.oldIndex === evt.newIndex) return;
                     
@@ -577,7 +598,6 @@
                     db.ref(DATA_PATH).update(updates);
                 },
 
-                // 優化：加入錯誤捕獲與安全防護，避免大圖導致 iOS 崩潰
                 exportImage() {
                     const el = document.getElementById('app');
                     html2canvas(el, { 
