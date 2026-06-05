@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>tokyo V1</title>
     
-    <link rel="icon" href="icon.png.V2" type="image/png">
+    <link class="icon" href="icon.png.V2" type="image/png">
     <link rel="apple-touch-icon" href="icon.png.V2">
     
     <link rel="manifest" href="manifest.json">
@@ -23,7 +23,7 @@
 
     <style>
         :root { 
-            --main-color: #333333; /* 質感深灰，不是死黑 */
+            --main-color: #333333; 
             --bg-gray: #F8FBFB; 
         }
         body { 
@@ -63,7 +63,6 @@
             opacity: 0.3;
         }
         
-        /* 讓備註相關的 textarea 與文字顯示行距加寬，閱讀打字不擁擠 */
         .memo-textarea, .memo-text-display {
             line-height: 1.65 !important;
         }
@@ -161,7 +160,10 @@
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-2 mt-1">
-                                    <span class="text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded font-bold">{{element.tag}}</span>
+                                    <!-- 列表明細文字統一固定顯示為：實際 或 行前 -->
+                                    <span class="text-[9px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded font-bold">
+                                        {{ (element.tag === '行前支出' || element.tag === '行前') ? '行前' : '實際' }}
+                                    </span>
                                     <p v-if="element.memo" class="text-[10px] text-gray-400 truncate flex-1 font-medium memo-text-display">{{element.memo}}</p>
                                 </div>
                             </div>
@@ -171,7 +173,9 @@
 
                 <div class="card-pop p-6 mt-6">
                     <h3 class="text-center font-black text-gray-400 text-xs mb-4 tracking-widest uppercase">支出比例分析</h3>
-                    <canvas id="expenseChart" class="max-w-full mx-auto"></canvas>
+                    <div class="relative w-full h-[220px]">
+                        <canvas id="expenseChart"></canvas>
+                    </div>
                 </div>
 
                 <button @click="openWalletModal()" class="fixed bottom-28 right-6 w-16 h-16 main-theme text-white rounded-full shadow-2xl flex items-center justify-center text-2xl border-4 border-white z-50"><i class="fas fa-plus"></i></button>
@@ -224,7 +228,7 @@
                                 <div class="flex-1" @click="openMemoModal(element)">
                                     <img v-if="element.image" :src="element.image" class="w-full rounded-xl mb-3 block pointer-events-none">
                                     <p class="text-sm text-gray-600 whitespace-pre-wrap font-medium pointer-events-none memo-text-display">{{element.text}}</p>
-                                    <a v-if="element.link" :href="element.link" target="_blank" @click.stop class="text-[10px] main-text font-bold mt-2 block break-all relative z-30"><i class="fas fa-link mr-1"></i>{{element.link}}</a>
+                                    <a v-if="element.link" :href="element.link" target="_blank" @click.stop class="text-[10px] text-slate-400 hover:text-slate-500 font-bold mt-2 block break-all relative z-30"><i class="fas fa-link mr-1"></i>{{element.link}}</a>
                                 </div>
                                 <button @click.stop="deleteData('memo', element.id)" class="text-gray-200 text-xs shrink-0 relative z-30"><i class="fas fa-times"></i></button>
                             </div>
@@ -242,6 +246,7 @@
             <button @click="activeTab = 'shop'" :class="{'active-tab': activeTab === 'shop'}" class="flex flex-col items-center text-gray-300"><i class="fas fa-shopping-bag text-xl"></i><span class="text-[9px] mt-1 font-black uppercase">Shop</span></button>
         </nav>
 
+        <!-- 彈出視窗：行程 -->
         <div v-if="modals.plan" class="fixed inset-0 bg-black/60 z-[60] flex items-end">
             <div class="bg-white w-full rounded-t-[40px] p-8 max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between mb-8"><h3 class="text-xl font-black">行程</h3><button @click="modals.plan = false" class="text-gray-400"><i class="fas fa-times"></i></button></div>
@@ -282,6 +287,8 @@
                 </div>
             </div>
         </div>
+
+        <!-- 彈出視窗：記帳 -->
         <div v-if="modals.wallet" class="fixed inset-0 bg-black/60 z-[60] flex items-end">
             <div class="bg-white w-full rounded-t-[40px] p-8 pb-12 overflow-y-auto max-h-[90vh]">
                 <div class="flex justify-between mb-8"><h3 class="text-xl font-black">記帳 💰</h3><button @click="modals.wallet = false" class="text-gray-400"><i class="fas fa-times"></i></button></div>
@@ -303,9 +310,10 @@
                     </div>
                     <div>
                         <label class="block text-xs font-black text-gray-400 mb-2">類型</label>
+                        <!-- 下拉選單選項精簡為：實際、行前 -->
                         <select v-model="form.wallet.tag" class="input-round text-xs font-bold">
-                            <option value="實際收支">實際收支</option>
-                            <option value="行前支出">行前預支</option>
+                            <option value="實際">實際</option>
+                            <option value="行前">行前</option>
                         </select>
                     </div>
                     <div><label class="block text-xs font-black text-gray-400 mb-2">備註</label><textarea v-model="form.wallet.memo" class="input-round h-20 memo-textarea"></textarea></div>
@@ -316,6 +324,8 @@
                 </div>
             </div>
         </div>
+
+        <!-- 彈出視窗：待買 -->
         <div v-if="modals.shop" class="fixed inset-0 bg-black/60 z-[60] flex items-end">
             <div class="bg-white w-full rounded-t-[40px] p-8 pb-12 overflow-y-auto max-h-[85vh]">
                 <div class="flex justify-between mb-8"><h3 class="text-xl font-black">待買 🛍️</h3><button @click="modals.shop = false" class="text-gray-400"><i class="fas fa-times"></i></button></div>
@@ -336,6 +346,8 @@
                 </div>
             </div>
         </div>
+
+        <!-- 彈出視窗：MEMO -->
         <div v-if="modals.memo" class="fixed inset-0 bg-black/60 z-[60] flex items-end">
             <div class="bg-white w-full rounded-t-[40px] p-8 pb-12 max-h-[90vh] overflow-y-auto">
                 <h3 class="font-black mb-6 text-lg">MEMO</h3>
@@ -354,6 +366,8 @@
                 </div>
             </div>
         </div>
+
+        <!-- 彈出視窗：今日主題 -->
         <div v-if="modals.summary" class="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-6">
             <div class="bg-white w-full rounded-[35px] p-8 shadow-2xl">
                 <h3 class="text-lg font-black text-center mb-6">今日主題</h3>
@@ -394,8 +408,8 @@
                     collapsedCats: ['美妝', '伴手禮', '服飾', '食物', '其他'], 
                     form: {
                         plan: { time: '09:00', place: '', note: '', transitType: '', transitTime: '', transitUnit: 'm', stayTime: '', stayUnit: 'm', mapUrl: '' },
-                        // 2. 預設類型直接幫你改成實際收支，方便記帳
-                        wallet: { type: '支出', amount: '', currency: 'JPY', name: '', method: '現金', category: '食物', tag: '實際收支', memo: '', rate: 0 },
+                        // 將預設 tag 設定為 '實際'
+                        wallet: { type: '支出', amount: '', currency: 'JPY', name: '', method: '現金', category: '食物', tag: '實際', memo: '', rate: 0 },
                         shop: { name: '', category: '美妝', image: '', memo: '', checked: false },
                         memo: { text: '', link: '', image: '' }
                     },
@@ -459,10 +473,11 @@
                         });
                     }
                 },
-                actualSpent() { return this.walletList.filter(i => (i.tag === '實際支出' || i.tag === '實際收支') && i.type === '支出').reduce((a,c) => a + this.getJPY(c), 0); },
-                actualSpentTWD() { return this.walletList.filter(i => (i.tag === '實際支出' || i.tag === '實際收支') && i.type === '支出').reduce((a,c) => a + this.getTWD(c), 0); },
-                preTripSpent() { return this.walletList.filter(i => i.tag === '行前支出' && i.type === '支出').reduce((a,c) => a + this.getJPY(c), 0); },
-                preTripSpentTWD() { return this.walletList.filter(i => i.tag === '行前支出' && i.type === '支出').reduce((a,c) => a + this.getTWD(c), 0); },
+                // 相容舊資料庫欄位，同時過濾 '實際支出'、'實際收支' 與最新的 '實際'
+                actualSpent() { return this.walletList.filter(i => ['實際支出', '實際收支', '實際'].includes(i.tag) && i.type === '支出').reduce((a,c) => a + this.getJPY(c), 0); },
+                actualSpentTWD() { return this.walletList.filter(i => ['實際支出', '實際收支', '實際'].includes(i.tag) && i.type === '支出').reduce((a,c) => a + this.getTWD(c), 0); },
+                preTripSpent() { return this.walletList.filter(i => ['行前支出', '行前'].includes(i.tag) && i.type === '支出').reduce((a,c) => a + this.getJPY(c), 0); },
+                preTripSpentTWD() { return this.walletList.filter(i => ['行前支出', '行前'].includes(i.tag) && i.type === '支出').reduce((a,c) => a + this.getTWD(c), 0); },
                 remainingCash() {
                     const base = Number(this.dbData.initialCash || 0);
                     const income = this.walletList.filter(i => i.type === '收入' && i.method === '現金' && i.currency === 'JPY').reduce((a,c) => a + Number(c.amount), 0);
@@ -495,7 +510,6 @@
                 },
                 isCollapsed(cat) { return this.collapsedCats.includes(cat); },
 
-                // 1. 修改圖表成條形圖 (Horizontal Bar Chart) 解決圓餅圖擠在一起的問題
                 initChart() {
                     const ctx = document.getElementById('expenseChart');
                     if (!ctx) return;
@@ -523,10 +537,11 @@
                             }]
                         },
                         options: { 
-                            indexAxis: 'y', // 水平排列
+                            indexAxis: 'y', 
                             responsive: true,
+                            maintainAspectRatio: false, 
                             plugins: { 
-                                legend: { display: false }, // 條形圖不需要上方圓餅圖的 Legend
+                                legend: { display: false }, 
                                 tooltip: {
                                     callbacks: {
                                         label: function(context) {
@@ -546,7 +561,6 @@
                                     }
                                 }
                             },
-                            // 在條形圖右側直接顯示詳細金額數字，一條一條排列超整齊！
                             animation: {
                                 onComplete: function() {
                                     const chartInstance = this;
@@ -577,10 +591,12 @@
                 openWalletModal(item = null) { 
                     if (item) {
                         this.form.wallet = {...item};
-                        if (this.form.wallet.tag === '實際支出') this.form.wallet.tag = '實際收支';
+                        // 相容舊資料，如果是舊稱則轉換至新稱「實際」或「行前」方便選單對應
+                        if (['實際支出', '實際收支'].includes(this.form.wallet.tag)) this.form.wallet.tag = '實際';
+                        if (this.form.wallet.tag === '行前支出') this.form.wallet.tag = '行前';
                     } else {
-                        // 2. 點擊新增時預設就是實際收支
-                        this.form.wallet = {type: '支出', amount: '', currency: 'JPY', name: '', method: '現金', category: '食物', tag: '實際收支', memo: '', rate: 0}; 
+                        // 新增時，預設選取「實際」
+                        this.form.wallet = {type: '支出', amount: '', currency: 'JPY', name: '', method: '現金', category: '食物', tag: '實際', memo: '', rate: 0}; 
                     }
                     this.modals.wallet = true; 
                 },
